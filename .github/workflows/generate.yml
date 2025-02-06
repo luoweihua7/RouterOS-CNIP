@@ -1,0 +1,38 @@
+name: Generate
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: 30 6 * * *
+
+env:
+  PUSH_BRANCH: 'release'
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.ACTION_TOKEN }}
+      - name: setup env
+        run: |
+          echo "ACTION_DATE=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
+          echo "TAG_NAME=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
+      - name: Generate List
+        run: |
+          bash -x script/generate.sh
+      - name: Push changes to ${{ env.PUSH_BRANCH }}
+        run: |
+          git clone -b ${{ env.PUSH_BRANCH }} "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" release_branch
+          cd release_branch
+          git rm -rf --ignore-unmatch .
+          cp -rv ../*.rsc ./
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git add -A .
+          git commit --allow-empty -m "commit ${{ env.TAG_NAME }}"
+          git push -f origin ${{ env.PUSH_BRANCH }}
